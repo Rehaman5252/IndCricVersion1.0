@@ -1,7 +1,7 @@
 'use client';
 import AdminAuthGuard from '@/app/components/admin/AdminAuthGuard';
 import AdminLayout from '@/app/components/admin/AdminLayout';
-import AdsManager from '@/app/components/admin/AdsManager';
+
 
 export default function AllAdsPage() {
   return (
