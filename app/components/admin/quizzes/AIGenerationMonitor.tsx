@@ -9,6 +9,14 @@ interface AIGenerationMonitorProps {
 }
 
 export default function AIGenerationMonitor({ status }: AIGenerationMonitorProps) {
+  // ---- Safe fallback values to avoid "possibly undefined" errors ----
+  const apiProvider = status.apiProvider ?? 'unknown';
+  const errorLog = status.errorLog ?? [];
+  const successRate = status.successRate ?? 0;
+  const avgTime = status.averageGenerationTime ?? 0;
+  const fallbackUsed = status.fallbackUsed ?? 0;
+  const failedAttempts = status.failedAttempts ?? 0;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Status Summary Cards */}
@@ -19,22 +27,23 @@ export default function AIGenerationMonitor({ status }: AIGenerationMonitorProps
           <div>
             <div className="flex justify-between items-center mb-2">
               <span className="text-white font-semibold">Success Rate (24h)</span>
-              <span className="text-3xl font-black text-white">{status.successRate}%</span>
+              <span className="text-3xl font-black text-white">{successRate}%</span>
             </div>
             <div className="bg-white bg-opacity-20 rounded-full h-3 overflow-hidden">
               <div
                 className="bg-white h-full"
-                style={{ width: `${status.successRate}%` }}
+                style={{ width: `${Math.max(0, Math.min(successRate, 100))}%` }}
               ></div>
             </div>
           </div>
 
           <div className="bg-white bg-opacity-10 rounded-lg p-4 mt-4">
             <p className="text-white text-sm">
-              <span className="font-bold">API Provider:</span> {status.apiProvider.toUpperCase()}
+              <span className="font-bold">API Provider:</span>{' '}
+              {apiProvider.toUpperCase()}
             </p>
             <p className="text-white text-sm mt-2">
-              <span className="font-bold">Avg Generation Time:</span> {status.averageGenerationTime}ms
+              <span className="font-bold">Avg Generation Time:</span> {avgTime}ms
             </p>
           </div>
         </div>
@@ -50,7 +59,7 @@ export default function AIGenerationMonitor({ status }: AIGenerationMonitorProps
               <span className="text-white font-semibold flex items-center gap-2">
                 <Zap className="h-5 w-5" /> Fallbacks Used
               </span>
-              <span className="text-3xl font-black text-yellow-300">{status.fallbackUsed}</span>
+              <span className="text-3xl font-black text-yellow-300">{fallbackUsed}</span>
             </div>
             <p className="text-white text-xs opacity-75">Times pool was used instead of AI</p>
           </div>
@@ -60,7 +69,7 @@ export default function AIGenerationMonitor({ status }: AIGenerationMonitorProps
               <span className="text-white font-semibold flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" /> Failed Attempts
               </span>
-              <span className="text-3xl font-black text-red-300">{status.failedAttempts}</span>
+              <span className="text-3xl font-black text-red-300">{failedAttempts}</span>
             </div>
             <p className="text-white text-xs opacity-75">API calls that returned errors</p>
           </div>
@@ -68,14 +77,22 @@ export default function AIGenerationMonitor({ status }: AIGenerationMonitorProps
           {/* Error Log */}
           <div className="bg-white bg-opacity-10 rounded-lg p-4 mt-4">
             <p className="text-white font-bold text-sm mb-2">Recent Errors:</p>
-            <div className="space-y-2">
-              {status.errorLog.slice(0, 3).map((err, idx) => (
-                <div key={idx} className="text-xs text-white opacity-80 border-l-2 border-red-400 pl-2">
-                  <p className="font-mono">{err.error}</p>
-                  <p className="text-xs opacity-60">Retry #{err.retryCount}</p>
-                </div>
-              ))}
-            </div>
+
+            {errorLog.length === 0 ? (
+              <p className="text-xs text-white opacity-70 italic">No recent errors</p>
+            ) : (
+              <div className="space-y-2">
+                {errorLog.slice(0, 3).map((err, idx) => (
+                  <div
+                    key={idx}
+                    className="text-xs text-white opacity-80 border-l-2 border-red-400 pl-2"
+                  >
+                    <p className="font-mono">{err.error}</p>
+                    <p className="text-xs opacity-60">Retry #{err.retryCount}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
