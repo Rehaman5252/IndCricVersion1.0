@@ -8,45 +8,49 @@ interface QuizSummaryCardsProps {
 }
 
 export default function QuizSummaryCards({ analytics }: QuizSummaryCardsProps) {
+  const safeNumber = (value: number | undefined) =>
+    (value ?? 0).toLocaleString();
+
   const cards = [
     {
       title: 'Total Quizzes',
-      value: analytics.totalQuizzesAllTime.toLocaleString(),
+      value: safeNumber(analytics.totalQuizzesAllTime),
       icon: '❓',
       color: 'from-purple-600 to-purple-700',
       description: 'All-time quizzes',
     },
     {
       title: 'Planned Today',
-      value: analytics.plannedToday.toLocaleString(),
+      value: safeNumber(analytics.plannedToday),
       icon: '📅',
       color: 'from-blue-600 to-blue-700',
       description: 'Scheduled slots',
     },
     {
       title: 'Total Participants',
-      value: analytics.totalParticipantsToday.toLocaleString(),
+      value: safeNumber(analytics.totalParticipantsToday),
       icon: '👥',
       color: 'from-green-600 to-green-700',
       description: 'Playing today',
     },
     {
       title: 'Questions Displayed',
-      value: (analytics.totalQuestionsDisplayed / 1000000).toFixed(1) + 'M',
+      value:
+        ((analytics.totalQuestionsDisplayed ?? 0) / 1_000_000).toFixed(1) + 'M',
       icon: '📊',
       color: 'from-yellow-600 to-yellow-700',
       description: 'All-time total',
     },
     {
       title: 'Active Slots',
-      value: analytics.activeSlots.toLocaleString(),
+      value: safeNumber(analytics.activeSlots),
       icon: '🔴',
       color: 'from-red-600 to-red-700',
       description: 'Running now',
     },
     {
       title: 'Failed AI Gen',
-      value: analytics.failedAIGenerations.toLocaleString(),
+      value: safeNumber(analytics.failedAIGenerations),
       icon: '⚠️',
       color: 'from-orange-600 to-orange-700',
       isCritical: true,
@@ -65,7 +69,9 @@ export default function QuizSummaryCards({ analytics }: QuizSummaryCardsProps) {
         >
           <div className="flex items-start justify-between mb-4">
             <div>
-              <p className="text-white text-sm font-semibold opacity-90">{card.title}</p>
+              <p className="text-white text-sm font-semibold opacity-90">
+                {card.title}
+              </p>
               <p className="text-gray-200 text-xs mt-1">{card.description}</p>
             </div>
             <span className="text-3xl">{card.icon}</span>
