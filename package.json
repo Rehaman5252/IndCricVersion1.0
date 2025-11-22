@@ -13,7 +13,11 @@
     "type-check": "tsc --noEmit"
   },
   "engines": {
+<<<<<<< HEAD
     "node": "22"
+=======
+    "node": "22.x"
+>>>>>>> 8ec5e5e2259e6670ebe5762e1aa244570c78c9b1
   },
   "dependencies": {
     "@genkit-ai/core": "^1.24.0",
