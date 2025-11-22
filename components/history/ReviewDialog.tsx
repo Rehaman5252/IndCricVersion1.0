@@ -1,4 +1,4 @@
-
+// src/components/history/ReviewDialog.tsx
 'use client';
 
 import { useState, memo } from 'react';
@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Award } from 'lucide-react';
 import type { QuizAttempt, QuizQuestion } from '@/ai/schemas';
-import ReportQuestionDialog from '@/components/quiz/ReportQuestionDialog';
+import { ReportQuestionDialog } from '@/components/quiz/ReportQuestionDialog';
 import { normalizeTimestamp } from '@/lib/dates';
 
 interface ReviewDialogProps {
@@ -54,6 +54,7 @@ const ReviewDialogComponent = ({
               For the {attempt.format} quiz on {formattedDate}.
             </DialogDescription>
           </DialogHeader>
+
           <div className="flex-grow overflow-y-auto pr-4 -mr-4 space-y-4 py-4">
             {attempt.questions.map((question, index) => (
               <Card
@@ -80,6 +81,7 @@ const ReviewDialogComponent = ({
                         </span>
                       </span>
                     </p>
+
                     <p className="flex items-start gap-2">
                       <Award className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                       <span>
@@ -90,12 +92,14 @@ const ReviewDialogComponent = ({
                       </span>
                     </p>
                   </div>
+
                   <Card className="bg-background/70 p-3">
                     <p className="text-xs text-muted-foreground font-semibold">
                       EXPLANATION
                     </p>
                     <p className="text-sm">{question.explanation}</p>
                   </Card>
+
                   <div className="pt-2 flex justify-center">
                     <Button
                       variant="ghost"
@@ -110,6 +114,7 @@ const ReviewDialogComponent = ({
               </Card>
             ))}
           </div>
+
           <div className="flex justify-end pt-4 border-t">
             <DialogClose asChild>
               <Button variant="outline">Close</Button>
@@ -118,15 +123,12 @@ const ReviewDialogComponent = ({
         </DialogContent>
       </Dialog>
 
-      {/* This ensures only one Report dialog is rendered at a time */}
       {reportingQuestion && (
         <ReportQuestionDialog
           question={reportingQuestion}
-          open={!!reportingQuestion}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setReportingQuestion(null);
-            }
+          open={Boolean(reportingQuestion)}
+          onOpenChange={(isOpen: boolean) => {
+            if (!isOpen) setReportingQuestion(null);
           }}
         />
       )}
