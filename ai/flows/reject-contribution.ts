@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileoverview This flow handles the rejection of a user-generated contribution.
@@ -10,28 +9,30 @@ import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { doc, runTransaction, increment } from 'firebase/firestore';
 
-export const RejectContributionInputSchema = z.object({
+const RejectContributionInputSchema = z.object({
     contributionId: z.string().describe("The ID of the contribution document to reject."),
 });
 
 export type RejectContributionInput = z.infer<typeof RejectContributionInputSchema>;
 
-export const RejectContributionOutputSchema = z.object({
+const RejectContributionOutputSchema = z.object({
     success: z.boolean(),
     message: z.string(),
 });
 
-export async function rejectContribution(input: RejectContributionInput): Promise<z.infer<typeof RejectContributionOutputSchema>> {
+export type RejectContributionOutput = z.infer<typeof RejectContributionOutputSchema>;
+
+export async function rejectContribution(input: RejectContributionInput): Promise<RejectContributionOutput> {
     return rejectContributionFlow(input);
 }
 
 const rejectContributionFlow = ai.defineFlow(
     {
         name: 'rejectContributionFlow',
-        inputSchema: RejectContributionInputSchema,
-        outputSchema: RejectContributionOutputSchema,
+        inputSchema: RejectContributionInputSchema as any,
+        outputSchema: RejectContributionOutputSchema as any,
     },
-    async (input) => {
+    async (input: RejectContributionInput): Promise<RejectContributionOutput> => {
         if (!db) {
             return { success: false, message: "Database connection not available." };
         }

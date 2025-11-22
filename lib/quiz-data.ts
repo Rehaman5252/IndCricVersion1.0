@@ -1,3 +1,4 @@
+// lib/quiz-data.ts
 import {
   Question,
   QuestionPool,
@@ -7,15 +8,21 @@ import {
   QuizInsight,
 } from './quiz-types';
 
+/**
+ * Mock analytics overview
+ */
 export const mockQuizAnalytics: QuizAnalytics = {
   totalQuizzesAllTime: 12584,
   plannedToday: 96,
   totalParticipantsToday: 45210,
-  totalQuestionsDisplayed: 1800000,
+  totalQuestionsDisplayed: 1_800_000,
   activeSlots: 5,
   failedAIGenerations: 3,
 };
 
+/**
+ * Mock question pools
+ */
 export const mockQuestionPools: QuestionPool[] = [
   {
     id: 'pool_ipl_hard',
@@ -59,6 +66,11 @@ export const mockQuestionPools: QuestionPool[] = [
   },
 ];
 
+/**
+ * NOTE:
+ * - `winners` in QuizSlot is kept as the numeric count (to match your QuizSlot type).
+ * - If you need structured winner records, use mockWinnersBySlot below.
+ */
 export const mockQuizSlots: QuizSlot[] = [
   {
     id: 'slot_001',
@@ -69,7 +81,7 @@ export const mockQuizSlots: QuizSlot[] = [
     durationMinutes: 10,
     status: 'completed',
     participants: 180,
-    winners: 3,
+    winners: 3, // numeric winners count
     questionsPerUser: 5,
     questionGeneration: {
       method: 'ai',
@@ -77,19 +89,15 @@ export const mockQuizSlots: QuizSlot[] = [
       aiModel: 'gemini-2.0',
       confidenceScore: 94.5,
     },
-    questions: [],
-    userParticipationMapping: [],
-    winners: [
-      { userId: 'u1', username: 'Arjun Singh', score: 5, rank: 1, prize: 8166 },
-      { userId: 'u2', username: 'Priya Sharma', score: 4, rank: 2, prize: 5000 },
-      { userId: 'u3', username: 'Rajesh Kumar', score: 3, rank: 3, prize: 3334 },
-    ],
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
     payoutLocked: true,
     createdBy: 'admin_001',
     createdAt: new Date('2025-10-29T10:00:00'),
     updatedAt: new Date('2025-10-30T01:15:00'),
     notes: 'AI generation successful. All questions verified.',
   },
+
   {
     id: 'slot_002',
     slotNumber: 1543,
@@ -105,15 +113,15 @@ export const mockQuizSlots: QuizSlot[] = [
       method: 'pool',
       status: 'success',
     },
-    questions: [],
-    userParticipationMapping: [],
-    winners: [],
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
     payoutLocked: false,
     createdBy: 'admin_001',
     createdAt: new Date('2025-10-29T10:05:00'),
     updatedAt: new Date('2025-10-30T01:10:00'),
     notes: 'Running live. Questions from verified pool.',
   },
+
   {
     id: 'slot_003',
     slotNumber: 1544,
@@ -130,15 +138,15 @@ export const mockQuizSlots: QuizSlot[] = [
       status: 'failed',
       errorMessage: 'AI API timeout. Fallback pool exhausted.',
     },
-    questions: [],
-    userParticipationMapping: [],
-    winners: [],
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
     payoutLocked: false,
     createdBy: 'admin_001',
     createdAt: new Date('2025-10-29T10:10:00'),
     updatedAt: new Date('2025-10-30T01:18:00'),
     notes: 'Cancelled due to AI generation failure and pool exhaustion.',
   },
+
   {
     id: 'slot_004',
     slotNumber: 1545,
@@ -154,9 +162,8 @@ export const mockQuizSlots: QuizSlot[] = [
       method: 'ai',
       status: 'pending',
     },
-    questions: [],
-    userParticipationMapping: [],
-    winners: [],
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
     payoutLocked: false,
     createdBy: 'admin_001',
     createdAt: new Date('2025-10-29T10:15:00'),
@@ -165,6 +172,27 @@ export const mockQuizSlots: QuizSlot[] = [
   },
 ];
 
+/**
+ * Optionally expose structured winner data separately so it doesn't conflict with QuizSlot type.
+ * This is useful for admin UI or tests that need full winner details.
+ */
+export const mockWinnersBySlot: Record<
+  string,
+  Array<{ userId: string; username: string; score: number; rank: number; prize: number }>
+> = {
+  slot_001: [
+    { userId: 'u1', username: 'Arjun Singh', score: 5, rank: 1, prize: 8166 },
+    { userId: 'u2', username: 'Priya Sharma', score: 4, rank: 2, prize: 5000 },
+    { userId: 'u3', username: 'Rajesh Kumar', score: 3, rank: 3, prize: 3334 },
+  ],
+  slot_002: [],
+  slot_003: [],
+  slot_004: [],
+};
+
+/**
+ * Mock AI generation status logs
+ */
 export const mockAIGenerationStatus: AIGenerationStatus = {
   id: 'ai_status_001',
   slotId: 'slot_001',
@@ -188,6 +216,9 @@ export const mockAIGenerationStatus: AIGenerationStatus = {
   ],
 };
 
+/**
+ * Mock quick insights
+ */
 export const mockQuizInsights: QuizInsight[] = [
   {
     message: '98.3% AI question generation success rate (Last 24h)',

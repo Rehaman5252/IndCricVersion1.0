@@ -10,8 +10,7 @@ import { CheckCircle2, AlertCircle, Edit } from 'lucide-react';
 import { calculateAge, maskPhone } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { sendEmailVerification } from 'firebase/auth';
-import { getAuth } from '@/lib/firebase';
-// ✅ FIXED: Use @/ alias for imports
+// removed incorrect import: import { getAuth } from '@/lib/firebase';
 import { PhoneVerificationDialog } from '@/components/profile/PhoneVerificationDialog';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
 import { normalizeTimestamp } from '@/lib/dates';
@@ -27,16 +26,16 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
     const isEmailVerified = user?.emailVerified || false;
 
     const handleResendVerification = async () => {
-        const auth = getAuth();
-        if (!user || !auth) {
+        if (!user) {
             toast({ 
                 title: 'Error', 
-                description: 'You must be logged in.', 
+                description: 'You must be logged in to resend verification.', 
                 variant: 'destructive' 
             });
             return;
         }
         try {
+            // sendEmailVerification only needs the User object
             await sendEmailVerification(user);
             toast({ 
                 title: 'Verification Email Sent', 
@@ -45,7 +44,7 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
         } catch (error: any) {
             console.error("Error resending verification email:", error);
             let message = "Could not send verification email.";
-            if (error.code === 'auth/too-many-requests') {
+            if (error?.code === 'auth/too-many-requests') {
                 message = "You've requested this too many times. Please wait before trying again.";
             }
             toast({ title: 'Error', description: message, variant: 'destructive' });
@@ -72,7 +71,7 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
             <CardContent className="p-4 flex flex-col sm:flex-row items-center text-center sm:text-left gap-4">
                 <Avatar className="w-20 h-20 border-4 border-background shadow-lg">
                     <AvatarImage 
-                        src={userProfile?.photoURL || `https://placehold.co/100x100.png`} 
+                        src={userProfile?.photoURL || '/mnt/data/d74f5636-13e1-41c9-9ddb-cd20f6bbc815.png'} 
                         alt="User Avatar" 
                         data-ai-hint="avatar person" 
                     />
@@ -86,7 +85,7 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
                         <p className="text-muted-foreground text-sm">
                             {maskPhone(userProfile?.phone)}
                         </p>
-                        {userProfile.phone ? (
+                        {userProfile?.phone ? (
                             isPhoneVerified ? (
                                 <CheckCircle2 
                                     className="h-4 w-4 text-green-500" 

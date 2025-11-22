@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileoverview This flow handles submissions of user-generated content like facts, posts, and questions.
@@ -30,29 +29,31 @@ const QuestionSchema = z.object({
 });
 
 // Union schema for any contribution
-export const ContributionInputSchema = z.object({
+const ContributionInputSchema = z.object({
     userId: z.string(),
 }).and(z.union([FactSchema, PostSchema, QuestionSchema]));
 
 export type ContributionInput = z.infer<typeof ContributionInputSchema>;
 
-export const ContributionOutputSchema = z.object({
+const ContributionOutputSchema = z.object({
     success: z.boolean(),
     message: z.string(),
     contributionId: z.string().optional(),
 });
 
-export async function submitContribution(input: ContributionInput): Promise<z.infer<typeof ContributionOutputSchema>> {
+export type ContributionOutput = z.infer<typeof ContributionOutputSchema>;
+
+export async function submitContribution(input: ContributionInput): Promise<ContributionOutput> {
     return submitContributionFlow(input);
 }
 
 const submitContributionFlow = ai.defineFlow(
     {
         name: 'submitContributionFlow',
-        inputSchema: ContributionInputSchema,
-        outputSchema: ContributionOutputSchema,
+        inputSchema: ContributionInputSchema as any,
+        outputSchema: ContributionOutputSchema as any,
     },
-    async (input) => {
+    async (input: ContributionInput): Promise<ContributionOutput> => {
         if (!db) {
             return { success: false, message: "Database connection not available." };
         }

@@ -9,7 +9,7 @@ import { CheckCircle2, AlertCircle, Edit } from 'lucide-react';
 import { calculateAge, maskPhone } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { sendEmailVerification } from 'firebase/auth';
-import { getAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';  // ✅ Changed: import auth instead of getAuth
 import { PhoneVerificationDialog } from '@/components/profile/PhoneVerificationDialog';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
 import { normalizeTimestamp } from '@/lib/dates';
@@ -25,21 +25,33 @@ function ProfileHeader({ userProfile }: { userProfile: any }) {
   const isEmailVerified = user?.emailVerified || false;
 
   const handleResendVerification = async () => {
-    const auth = getAuth();
+    // ✅ Changed: Use auth directly instead of calling getAuth()
     if (!user || !auth) {
-      toast({ title: 'Error', description: 'You must be logged in.', variant: 'destructive' });
+      toast({ 
+        title: 'Error', 
+        description: 'You must be logged in.', 
+        variant: 'destructive' 
+      });
       return;
     }
+    
     try {
       await sendEmailVerification(user);
-      toast({ title: 'Verification Email Sent', description: 'Please check your inbox to verify your email address.' });
+      toast({ 
+        title: 'Verification Email Sent', 
+        description: 'Please check your inbox to verify your email address.' 
+      });
     } catch (error: any) {
       console.error("Error resending verification email:", error);
       let message = "Could not send verification email.";
       if (error.code === 'auth/too-many-requests') {
         message = "You've requested this too many times. Please wait before trying again.";
       }
-      toast({ title: 'Error', description: message, variant: 'destructive' });
+      toast({ 
+        title: 'Error', 
+        description: message, 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -50,7 +62,11 @@ function ProfileHeader({ userProfile }: { userProfile: any }) {
       {user && profile && (
         <div className="absolute top-2 right-2 z-10">
           <EditProfileDialog userProfile={profile}>
-            <Button variant="outline" size="icon" className="bg-card border-primary text-primary hover:bg-primary/10 hover:text-primary h-8 w-8">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="bg-card border-primary text-primary hover:bg-primary/10 hover:text-primary h-8 w-8"
+            >
               <Edit className="h-4 w-4" aria-label="Edit Profile" />
             </Button>
           </EditProfileDialog>
@@ -58,19 +74,30 @@ function ProfileHeader({ userProfile }: { userProfile: any }) {
       )}
       <CardContent className="p-4 flex flex-col sm:flex-row items-center text-center sm:text-left gap-4">
         <Avatar className="w-20 h-20 border-4 border-background shadow-lg">
-          <AvatarImage src={userProfile?.photoURL || `https://placehold.co/100x100.png`} alt="User Avatar" data-ai-hint="avatar person" />
+          <AvatarImage 
+            src={userProfile?.photoURL || `https://placehold.co/100x100.png`} 
+            alt="User Avatar" 
+            data-ai-hint="avatar person" 
+          />
           <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1 space-y-1">
-          <h2 className="text-2xl font-bold text-foreground">{userProfile?.name || 'New User'}</h2>
+          <h2 className="text-2xl font-bold text-foreground">
+            {userProfile?.name || 'New User'}
+          </h2>
           <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-            <p className="text-muted-foreground text-sm">{maskPhone(userProfile?.phone)}</p>
+            <p className="text-muted-foreground text-sm">
+              {maskPhone(userProfile?.phone)}
+            </p>
             {userProfile.phone ? (
               isPhoneVerified ? (
                 <CheckCircle2 className="h-4 w-4 text-green-500" aria-label="Verified Phone" />
               ) : (
                 <PhoneVerificationDialog phone={userProfile.phone}>
-                  <Button variant="link" className="p-0 h-auto text-yellow-500 text-sm hover:no-underline">
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-yellow-500 text-sm hover:no-underline"
+                  >
                     <AlertCircle className="h-4 w-4 mr-1" aria-label="Verify Now" />
                     Verify Now
                   </Button>
@@ -79,12 +106,18 @@ function ProfileHeader({ userProfile }: { userProfile: any }) {
             ) : null}
           </div>
           <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-            <p className="text-muted-foreground text-sm">{userProfile?.email || 'No email set'}</p>
+            <p className="text-muted-foreground text-sm">
+              {userProfile?.email || 'No email set'}
+            </p>
             {userProfile.email && (
               isEmailVerified ? (
                 <CheckCircle2 className="h-4 w-4 text-green-500" aria-label="Verified Email" />
               ) : (
-                <Button variant="link" className="p-0 h-auto text-yellow-500 text-sm hover:no-underline" onClick={handleResendVerification}>
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto text-yellow-500 text-sm hover:no-underline" 
+                  onClick={handleResendVerification}
+                >
                   <AlertCircle className="h-4 w-4 mr-1" aria-label="Resend Link" />
                   Resend Link
                 </Button>

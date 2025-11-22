@@ -1,12 +1,14 @@
+// app/components/home/CubeFaceWithAd.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { getAdsBySlot, Ad, logAdView } from '@/lib/ad-service';
 import { motion } from 'framer-motion';
+import type { AdSlot } from '@/types/ads'; // <-- use the AdSlot type from your types file
 
 interface CubeFaceWithAdProps {
-  format: string; // T20, IPL, ODI, WPL, Test, Mixed
+  format: AdSlot; // <- strongly typed now
   brand: string; // Amazon, Netflix, etc.
   onClick: () => void;
   userId: string;
@@ -25,20 +27,30 @@ export default function CubeFaceWithAd({
   const [adViewed, setAdViewed] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchAd = async () => {
       try {
+        setLoading(true);
+        // format is already typed as AdSlot so no cast required
         console.log(`🔍 Fetching ad for cube face: ${format}`);
-        const ads = await getAdsBySlot(format as any);
+        const ads = await getAdsBySlot(format);
 
-        if (ads.length > 0) {
+        if (!mounted) return;
+
+        if (ads && ads.length > 0) {
           const selectedAd = ads[0];
           setAd(selectedAd);
           console.log(`✅ Cube ad found: ${selectedAd.companyName} (${format})`);
 
-          // Log view
+          // Log view (only once)
           if (!adViewed && userId) {
-            await logAdView(selectedAd.id, userId, format, selectedAd.companyName);
-            setAdViewed(true);
+            try {
+              await logAdView(selectedAd.id, userId, format, selectedAd.companyName);
+              setAdViewed(true);
+            } catch (logErr) {
+              console.warn('Unable to log ad view:', logErr);
+            }
           }
         } else {
           console.log(`⚠️ No ad for format: ${format}, showing default brand`);
@@ -46,27 +58,30 @@ export default function CubeFaceWithAd({
         }
       } catch (error) {
         console.error(`❌ Error fetching ad for ${format}:`, error);
-        setAd(null);
+        if (mounted) setAd(null);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     fetchAd();
+
+    return () => {
+      mounted = false;
+    };
   }, [format, userId, adViewed]);
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: index * 0.1 }}
+      transition={{ delay: index * 0.06 }}
       onClick={onClick}
       className="cursor-pointer group"
     >
       <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-2 border-gray-700 hover:border-blue-500 transition-all duration-300 hover:shadow-2xl hover:scale-105 shadow-lg">
-        
         {/* AD IMAGE (if available) */}
-        {ad && ad.mediaUrl && (
+        {ad && ad.mediaUrl ? (
           <>
             <Image
               src={ad.mediaUrl}
@@ -75,7 +90,8 @@ export default function CubeFaceWithAd({
               className="w-full h-full object-cover"
               priority={index === 0}
               onError={(e) => {
-                console.error(`❌ Failed to load ad image for ${format}`);
+                // Next/Image onError receives a synthetic event; just log
+                console.error(`❌ Failed to load ad image for ${format}`, e);
               }}
             />
             {/* Overlay with company name */}
@@ -84,21 +100,21 @@ export default function CubeFaceWithAd({
               <p className="text-yellow-400 text-xs font-semibold">{format}</p>
             </div>
           </>
-        )}
-
-        {/* FALLBACK: Brand Logo (if no ad) */}
-        {!ad && !loading && (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-800">
-            <div className="text-3xl font-bold text-yellow-500">{brand[0]}</div>
-            <p className="text-white text-sm font-semibold">{brand}</p>
-            <p className="text-gray-400 text-xs">{format}</p>
-          </div>
+        ) : (
+          // FALLBACK: Brand Logo (if no ad)
+          !loading && (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-800">
+              <div className="text-3xl font-bold text-yellow-500">{brand?.charAt(0) ?? '?'}</div>
+              <p className="text-white text-sm font-semibold truncate max-w-full">{brand}</p>
+              <p className="text-gray-400 text-xs">{format}</p>
+            </div>
+          )
         )}
 
         {/* LOADING STATE */}
         {loading && (
           <div className="w-full h-full flex items-center justify-center bg-gray-800">
-            <div className="animate-spin w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full"></div>
+            <div className="animate-spin w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full" />
           </div>
         )}
 

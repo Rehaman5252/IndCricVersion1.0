@@ -27,9 +27,9 @@ export type GenerateFactsOutput = z.infer<typeof GenerateFactsOutputSchema>;
 
 const prompt = ai.definePrompt({
   name: 'generateCricketFactsPrompt',
-  model: MODEL_NAME, // ✅ gemini-2.5-flash
-  input: { schema: GenerateFactsInputSchema },
-  output: { schema: GenerateFactsOutputSchema },
+  model: MODEL_NAME,
+  input: { schema: GenerateFactsInputSchema as any },
+  output: { schema: GenerateFactsOutputSchema as any },
   prompt: `
 Generate {{count}} interesting, accurate cricket fact(s) related to: "{{context}}".
 
@@ -74,8 +74,8 @@ const getFallbackFacts = (count: number): GenerateFactsOutput => {
 export const generateCricketFactsFlow = ai.defineFlow(
   {
     name: 'generateCricketFactsFlow',
-    inputSchema: GenerateFactsInputSchema,
-    outputSchema: GenerateFactsOutputSchema,
+    inputSchema: GenerateFactsInputSchema as any,
+    outputSchema: GenerateFactsOutputSchema as any,
   },
   async (input: GenerateFactsInput): Promise<GenerateFactsOutput> => {
     try {

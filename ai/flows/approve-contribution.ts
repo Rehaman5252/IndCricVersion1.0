@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileoverview This flow handles the approval of a user-generated contribution.
@@ -10,28 +9,30 @@ import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { doc, runTransaction, increment } from 'firebase/firestore';
 
-export const ApproveContributionInputSchema = z.object({
+const ApproveContributionInputSchema = z.object({
     contributionId: z.string().describe("The ID of the contribution document to approve."),
 });
 
 export type ApproveContributionInput = z.infer<typeof ApproveContributionInputSchema>;
 
-export const ApproveContributionOutputSchema = z.object({
+const ApproveContributionOutputSchema = z.object({
     success: z.boolean(),
     message: z.string(),
 });
 
-export async function approveContribution(input: ApproveContributionInput): Promise<z.infer<typeof ApproveContributionOutputSchema>> {
+export type ApproveContributionOutput = z.infer<typeof ApproveContributionOutputSchema>;
+
+export async function approveContribution(input: ApproveContributionInput): Promise<ApproveContributionOutput> {
     return approveContributionFlow(input);
 }
 
 const approveContributionFlow = ai.defineFlow(
     {
         name: 'approveContributionFlow',
-        inputSchema: ApproveContributionInputSchema,
-        outputSchema: ApproveContributionOutputSchema,
+        inputSchema: ApproveContributionInputSchema as any,
+        outputSchema: ApproveContributionOutputSchema as any,
     },
-    async (input: ApproveContributionInput) => {
+    async (input: ApproveContributionInput): Promise<ApproveContributionOutput> => {
         if (!db) {
             return { success: false, message: "Database connection not available." };
         }

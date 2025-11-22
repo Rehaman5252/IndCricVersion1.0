@@ -1,97 +1,233 @@
-'use server';
+// lib/quiz-data.ts
+import {
+  Question,
+  QuestionPool,
+  QuizSlot,
+  AIGenerationStatus,
+  QuizAnalytics,
+  QuizInsight,
+  Winner,
+} from './quiz-types';
 
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-import { QuizAttempt, QuizAnalysisOutput, QuizAnalysisOutputSchema } from '@/ai/schemas';
-import { sanitizeQuizAttempt } from '@/lib/sanitizeUserProfile';
-
-const FALLBACK_ANALYSIS: QuizAnalysisOutput = {
-  summary: "We couldn’t generate an AI analysis this time, so here are general insights based on typical quiz performance.",
-  strengths: [
-    "You completed the quiz – great consistency!",
-    "You’re building recall under time pressure.",
-  ],
-  weaknesses: [
-    "Occasional hesitation on trick questions.",
-    "Some gaps in fundamentals surfaced.",
-  ],
-  recommendations: [
-    "Revisit questions you answered incorrectly and note why.",
-    "Practice with shorter, timed sets to improve pace.",
-    "Review one focused topic each day for a week.",
-  ],
-  source: "fallback",
+/**
+ * Mock analytics overview
+ */
+export const mockQuizAnalytics: QuizAnalytics = {
+  totalQuizzesAllTime: 12584,
+  plannedToday: 96,
+  totalParticipantsToday: 45210,
+  totalQuestionsDisplayed: 1_800_000,
+  activeSlots: 5,
+  failedAIGenerations: 3,
 };
 
-export async function generateQuizAnalysis(rawAttempt: any): Promise<QuizAnalysisOutput> {
-    const sanitized = sanitizeQuizAttempt(rawAttempt);
-    if (!sanitized) {
-        console.error(`[Analysis] Sanitization failed for quiz attempt. Returning fallback.`);
-        return FALLBACK_ANALYSIS;
-    }
-    try {
-        const validatedAttempt = QuizAttempt.parse(sanitized);
-        const analysis = await generateQuizAnalysisFlow({ attempt: validatedAttempt });
-        return analysis;
-    } catch (error: any) {
-        console.error(`[Analysis] Validation failed for quiz attempt. Returning fallback.`, {
-            userId: sanitized.userId,
-            slotId: sanitized.slotId,
-            error: error?.errors ?? error,
-        });
-        return FALLBACK_ANALYSIS;
-    }
-}
+/**
+ * Mock question pools
+ */
+export const mockQuestionPools: QuestionPool[] = [
+  {
+    id: 'pool_ipl_hard',
+    format: 'IPL',
+    difficulty: 'hard',
+    totalQuestions: 2000,
+    usedThisMonth: 310,
+    remaining: 1690,
+    retiredQuestions: 45,
+    lastUpdated: new Date('2025-11-07'),
+  },
+  {
+    id: 'pool_test_medium',
+    format: 'Test',
+    difficulty: 'medium',
+    totalQuestions: 5000,
+    usedThisMonth: 2000,
+    remaining: 3000,
+    retiredQuestions: 120,
+    lastUpdated: new Date('2025-11-07'),
+  },
+  {
+    id: 'pool_t20i_easy',
+    format: 'T20I',
+    difficulty: 'easy',
+    totalQuestions: 3000,
+    usedThisMonth: 1200,
+    remaining: 1800,
+    retiredQuestions: 80,
+    lastUpdated: new Date('2025-11-07'),
+  },
+  {
+    id: 'pool_odi_medium',
+    format: 'ODI',
+    difficulty: 'medium',
+    totalQuestions: 4000,
+    usedThisMonth: 1500,
+    remaining: 2500,
+    retiredQuestions: 100,
+    lastUpdated: new Date('2025-11-07'),
+  },
+];
 
-const quizAnalysisPrompt = ai.definePrompt({
-    name: 'generateQuizAnalysisPrompt',
-    input: { schema: z.object({ attempt: QuizAttempt }) },
-    output: { schema: QuizAnalysisOutputSchema },
-    prompt: `
-    You are an expert cricket quiz analyst and coach. Your goal is to provide an insightful, detailed, and helpful performance analysis for a user based on their recent quiz attempt. Be encouraging but also provide concrete, actionable feedback.
-
-    Analyze the following quiz data for the "{{attempt.format}}" format:
-    - Score: {{attempt.score}} out of {{attempt.totalQuestions}}
-    - Questions, User Answers, and Time Taken:
-      {{#each attempt.questions}}
-      - Q{{@index + 1}}: {{this.question}}
-        - Your Answer: {{../attempt.userAnswers.[@index]}}
-        - Correct Answer: {{this.correctAnswer}}
-        - Time Taken: {{../attempt.timePerQuestion.[@index]}}s
-      {{/each}}
-
-    Return STRICTLY a JSON object that matches this shape:
-    {
-      "summary": string,            // concise overall insight
-      "strengths": string[],        // bullet points of strengths
-      "weaknesses": string[],       // bullet points of weaknesses
-      "recommendations": string[],  // actionable next steps
-      "source": "ai"
-    }
-  `,
-});
-
-export const generateQuizAnalysisFlow = ai.defineFlow(
-    {
-        name: 'generateQuizAnalysisFlow',
-        inputSchema: z.object({ attempt: QuizAttempt }),
-        outputSchema: QuizAnalysisOutputSchema,
+/**
+ * Mock quiz slots
+ * Note: winnersCount (number) and winnersList (structured array) used to avoid duplicate property/type issues.
+ */
+export const mockQuizSlots: QuizSlot[] = [
+  {
+    id: 'slot_001',
+    slotNumber: 1542,
+    scheduledDate: new Date('2025-10-30'),
+    startTime: '01:00 PM',
+    endTime: '01:10 PM',
+    durationMinutes: 10,
+    status: 'completed',
+    participants: 180,
+    winnersCount: 3, // numeric winners count
+    questionsPerUser: 5,
+    questionGeneration: {
+      method: 'ai',
+      status: 'success',
+      aiModel: 'gemini-2.0',
+      confidenceScore: 94.5,
     },
-    async ({ attempt }) => {
-        try {
-            const { output } = await quizAnalysisPrompt({ attempt });
-            const parsed = QuizAnalysisOutputSchema.safeParse(output);
-            if (!parsed.success) {
-                console.error(
-                    "[generateQuizAnalysisFlow] Schema validation failed:",
-                    parsed.error?.format?.() ?? parsed.error
-                );
-                return FALLBACK_ANALYSIS;
-            }
-            return { ...parsed.data, source: "ai" } as QuizAnalysisOutput;
-        } catch (err) {
-            console.error("[generateQuizAnalysisFlow] Unexpected error:", err);
-            return FALLBACK_ANALYSIS;
-        }
-    }
-);
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
+    winnersList: [
+      { userId: 'u1', username: 'Arjun Singh', score: 5, rank: 1, prize: 8166 },
+      { userId: 'u2', username: 'Priya Sharma', score: 4, rank: 2, prize: 5000 },
+      { userId: 'u3', username: 'Rajesh Kumar', score: 3, rank: 3, prize: 3334 },
+    ],
+    payoutLocked: true,
+    createdBy: 'admin_001',
+    createdAt: new Date('2025-10-29T10:00:00'),
+    updatedAt: new Date('2025-10-30T01:15:00'),
+    notes: 'AI generation successful. All questions verified.',
+  },
+
+  {
+    id: 'slot_002',
+    slotNumber: 1543,
+    scheduledDate: new Date('2025-10-30'),
+    startTime: '01:10 PM',
+    endTime: '01:20 PM',
+    durationMinutes: 10,
+    status: 'live',
+    participants: 312,
+    winnersCount: 0,
+    questionsPerUser: 5,
+    questionGeneration: {
+      method: 'pool',
+      status: 'success',
+    },
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
+    winnersList: [], // empty when none
+    payoutLocked: false,
+    createdBy: 'admin_001',
+    createdAt: new Date('2025-10-29T10:05:00'),
+    updatedAt: new Date('2025-10-30T01:10:00'),
+    notes: 'Running live. Questions from verified pool.',
+  },
+
+  {
+    id: 'slot_003',
+    slotNumber: 1544,
+    scheduledDate: new Date('2025-10-30'),
+    startTime: '01:20 PM',
+    endTime: '01:30 PM',
+    durationMinutes: 10,
+    status: 'cancelled',
+    participants: 0,
+    winnersCount: 0,
+    questionsPerUser: 5,
+    questionGeneration: {
+      method: 'ai',
+      status: 'failed',
+      errorMessage: 'AI API timeout. Fallback pool exhausted.',
+    },
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
+    winnersList: [],
+    payoutLocked: false,
+    createdBy: 'admin_001',
+    createdAt: new Date('2025-10-29T10:10:00'),
+    updatedAt: new Date('2025-10-30T01:18:00'),
+    notes: 'Cancelled due to AI generation failure and pool exhaustion.',
+  },
+
+  {
+    id: 'slot_004',
+    slotNumber: 1545,
+    scheduledDate: new Date('2025-10-30'),
+    startTime: '03:00 PM',
+    endTime: '03:10 PM',
+    durationMinutes: 10,
+    status: 'scheduled',
+    participants: 0,
+    winnersCount: 0,
+    questionsPerUser: 5,
+    questionGeneration: {
+      method: 'ai',
+      status: 'pending',
+    },
+    questions: [] as Question[],
+    userParticipationMapping: [] as any[],
+    winnersList: [],
+    payoutLocked: false,
+    createdBy: 'admin_001',
+    createdAt: new Date('2025-10-29T10:15:00'),
+    updatedAt: new Date('2025-10-29T10:15:00'),
+    notes: 'Scheduled. AI generation pending.',
+  },
+];
+
+/**
+ * Mock AI generation status logs
+ */
+export const mockAIGenerationStatus: AIGenerationStatus = {
+  id: 'ai_status_001',
+  slotId: 'slot_001',
+  timestamp: new Date('2025-10-30T01:00:00'),
+  apiProvider: 'gemini',
+  successRate: 98.3,
+  averageGenerationTime: 2450,
+  fallbackUsed: 12,
+  failedAttempts: 3,
+  errorLog: [
+    {
+      timestamp: new Date('2025-10-30T00:45:00'),
+      error: 'API timeout after 30s',
+      retryCount: 1,
+    },
+    {
+      timestamp: new Date('2025-10-30T00:50:00'),
+      error: 'Invalid JSON response',
+      retryCount: 2,
+    },
+  ],
+};
+
+/**
+ * Mock quick insights
+ */
+export const mockQuizInsights: QuizInsight[] = [
+  {
+    message: '98.3% AI question generation success rate (Last 24h)',
+    type: 'success',
+    metric: 'AI Success',
+  },
+  {
+    message: 'Question pool "IPL Hard" running low: 1,690 remaining',
+    type: 'warning',
+    metric: 'Pool Health',
+  },
+  {
+    message: '9:00 PM slot is peak participation time: 95% engagement',
+    type: 'info',
+    metric: 'Peak Hours',
+  },
+  {
+    message: '12 fallbacks used in last 24h - AI quality score dropping',
+    type: 'warning',
+    metric: 'Fallbacks',
+  },
+];

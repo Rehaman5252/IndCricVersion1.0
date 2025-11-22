@@ -23,9 +23,9 @@ export type RefineTextOutput = z.infer<typeof RefineTextOutputSchema>;
 
 const prompt = ai.definePrompt({
   name: 'refineTextPrompt',
-  model: MODEL_NAME, // ✅ gemini-2.5-flash
-  input: { schema: RefineTextInputSchema },
-  output: { schema: RefineTextOutputSchema },
+  model: MODEL_NAME,
+  input: { schema: RefineTextInputSchema as any },
+  output: { schema: RefineTextOutputSchema as any },
   prompt: `
 Refine this text according to {{refinementType}} type:
 
@@ -62,8 +62,8 @@ const getFallbackRefinement = (input: RefineTextInput): RefineTextOutput => {
 export const refineTextFlow = ai.defineFlow(
   {
     name: 'refineTextFlow',
-    inputSchema: RefineTextInputSchema,
-    outputSchema: RefineTextOutputSchema,
+    inputSchema: RefineTextInputSchema as any,
+    outputSchema: RefineTextOutputSchema as any,
   },
   async (input: RefineTextInput): Promise<RefineTextOutput> => {
     try {

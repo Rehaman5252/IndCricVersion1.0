@@ -1,374 +1,308 @@
+// app/components/history/QuizHistoryContent.tsx
 'use client';
 
-import React, { Suspense, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import z from 'zod';
+import React, { useState, memo, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from '@/components/ui/card';
+  Award,
+  Ban,
+  Sparkles,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Eye,
+  ServerCrash,
+  WifiOff,
+  Check,
+  Loader2,
+} from 'lucide-react';
+import type { QuizAttempt } from '@/ai/schemas';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { AdDialog } from '@/components/AdDialog';
+// Use named ad helper imports
+import { getAdForSlot, getInterstitialAdForSlot } from '@/lib/ads';
+import AnalysisDialog from '@/components/history/AnalysisDialog';
+import ReviewDialog from '@/components/history/ReviewDialog';
 import { useAuth } from '@/context/AuthProvider';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
-import Link from 'next/link';
+// NOTE: different toast implementations vary; call toast via returned object
 import { useToast } from '@/hooks/use-toast';
-import { Checkbox } from '@/components/ui/checkbox';
+import { normalizeTimestamp } from '@/lib/dates';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/EmptyState';
 
-const signupSchema = z.object({
-  name: z.string().min(3, { message: 'Name must be at least 3 characters.' }),
-  email: z.string().email({ message: 'Please enter a valid email address.' }),
-  phone: z.string().regex(/^\d{10}$/, { message: 'Please enter a valid 10-digit phone number.' }),
-  password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
-  referralCode: z.string().optional(),
-  terms: z.boolean().refine((val) => val === true, {
-    message: 'You must accept the terms and conditions to continue.',
-  }),
-});
+// local fallback image path (dev)
+const LOCAL_FALLBACK_AD = '/assets/fallback-ad.png';
 
-const loginSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address.' }),
-  password: z.string().min(1, { message: 'Password is required.' }),
-});
-
-const GoogleIcon = (
-  <svg
-    className="mr-2 h-4 w-4"
-    aria-hidden="true"
-    focusable="false"
-    data-prefix="fab"
-    data-icon="google"
-    role="img"
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 488 512"
-  >
-    <path
-      fill="currentColor"
-      d="M488 261.8C488 403.3 381.5 512 244 512S0 403.3 0 261.8C0 120.3 106.5 8 244 8s244 112.3 244 253.8zM138.3 336.7c-21.7-21.7-33.2-50.2-33.2-80.1s11.5-58.4 33.2-80.1c21.7-21.7 50.2-33.2 80.1-33.2s58.4 11.5 80.1 33.2c21.7 21.7 33.2 50.2 33.2 80.1s-11.5 58.4-33.2 80.1c-21.7-21.7-50.2-33.2-80.1-33.2s-58.4 11.5-80.1-33.2z"
-    />
-  </svg>
+// Skeleton and error components (unchanged)
+export const HistoryItemSkeleton = () => (
+  <Card className="bg-card/80 shadow-lg">
+    <CardHeader>
+      <div className="flex items-start gap-4">
+        <Skeleton className="h-8 w-8 rounded-md mt-1 flex-shrink-0" />
+        <div className="flex-grow space-y-2">
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-3 w-5/6" />
+        </div>
+      </div>
+    </CardHeader>
+    <CardContent className="flex justify-end gap-2">
+      <Skeleton className="h-9 w-24 rounded-md" />
+      <Skeleton className="h-9 w-24 rounded-md" />
+    </CardContent>
+  </Card>
 );
 
-function AuthFormComponent({ type }: { type: 'login' | 'signup' }) {
-  const { registerWithEmail, loginWithEmail, signInWithGoogle, user } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const toast = useToast();
-  
-  // ✅ NEW: Password visibility states for both fields
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+export const ErrorStateDisplay = ({ message }: { message: string }) => (
+  <Alert variant="destructive" className="mt-4">
+    {message.includes('offline') || message.includes('unavailable') ? <WifiOff className="h-4 w-4" /> : <ServerCrash className="h-4 w-4" />}
+    <AlertTitle>Error Loading History</AlertTitle>
+    <AlertDescription>{message}</AlertDescription>
+  </Alert>
+);
 
-  const formSchema = type === 'login' ? loginSchema : signupSchema;
+const getSlotTimings = (timestamp: any) => {
+  const attemptDate = normalizeTimestamp(timestamp);
+  if (!attemptDate) return 'Invalid Time';
 
-  const form = useForm({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      phone: '',
-      password: '',
-      referralCode: searchParams.get('ref') ?? '',
-      terms: false,
-    },
-  });
+  const minutes = attemptDate.getMinutes();
+  const slotStartMinute = Math.floor(minutes / 10) * 10;
 
-  const isSubmitting = form.formState.isSubmitting;
+  const slotStartTime = new Date(attemptDate);
+  slotStartTime.setMinutes(slotStartMinute, 0, 0);
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    const from = searchParams.get('from') ?? '/';
+  const slotEndTime = new Date(slotStartTime.getTime() + 10 * 60 * 1000);
 
-    let result = null;
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Kolkata',
+    });
 
-    if (type === 'signup') {
-      const { name, email, phone, password, referralCode } = values as z.infer<
-        typeof signupSchema
-      >;
-      result = await registerWithEmail(name, email, phone, password, referralCode);
+  return `${formatTime(slotStartTime)} - ${formatTime(slotEndTime)}`;
+};
 
-      if (result) {
-        toast({
-          title: 'Signup Successful!',
-          description: 'A verification link has been sent to your email. Please verify to continue.',
+type AdDialogConfig = {
+  type: 'image' | 'video';
+  url: string;
+  title?: string;
+  duration?: number;
+  skippableAfter?: number;
+  hint?: string;
+};
+
+const HistoryItemComponent = ({ attempt }: { attempt: QuizAttempt }) => {
+  const { markAttemptAsReviewed } = useAuth();
+  const toastApi = useToast(); // call toastApi.toast(...)
+  const [showAdDialog, setShowAdDialog] = useState(false);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const [isReviewed, setIsReviewed] = useState(Boolean(attempt.reviewed));
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [adConfig, setAdConfig] = useState<AdDialogConfig | null>(null);
+
+  const isDisqualified = Boolean(attempt.reason);
+
+  const handleReviewClick = useCallback(async () => {
+    if (isDisqualified || isReviewing) return;
+    if (isReviewed) {
+      setShowReviewDialog(true);
+      return;
+    }
+
+    setIsReviewing(true);
+
+    try {
+      // try to get interstitial config first
+      const interstitial = await getInterstitialAdForSlot((attempt as any).adSlot);
+      if (interstitial) {
+        setAdConfig({
+          type: interstitial.type === 'video' ? 'video' : 'image',
+          url: interstitial.videoUrl ?? interstitial.logoUrl ?? LOCAL_FALLBACK_AD,
+          title: interstitial.videoTitle ?? interstitial.logoHint ?? 'Sponsored',
+          duration: interstitial.durationSec ?? Math.round((interstitial.durationMs ?? 7000) / 1000),
+          skippableAfter: interstitial.skippableAfterSec ?? 5,
+          hint: interstitial.hint,
+        });
+      } else {
+        // fallback to DB ad object (if any)
+        const dbAd = await getAdForSlot((attempt as any).adSlot);
+        if (dbAd) {
+          setAdConfig({
+            type: dbAd.adType === 'video' ? 'video' : 'image',
+            url: dbAd.mediaUrl || LOCAL_FALLBACK_AD,
+            title: dbAd.companyName || 'Sponsored',
+            duration: 7,
+            skippableAfter: 5,
+            hint: dbAd.companyName,
+          });
+        } else {
+          // final fallback
+          setAdConfig({
+            type: 'image',
+            url: LOCAL_FALLBACK_AD,
+            title: 'Sponsored',
+            duration: 7,
+            skippableAfter: 5,
+            hint: 'Sponsored',
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[HistoryItem] fetch ad error', err);
+      // fallback
+      setAdConfig({
+        type: 'image',
+        url: LOCAL_FALLBACK_AD,
+        title: 'Sponsored',
+        duration: 7,
+        skippableAfter: 5,
+        hint: 'Sponsored',
+      });
+    } finally {
+      setShowAdDialog(true);
+    }
+  }, [attempt, isDisqualified, isReviewing, isReviewed]);
+
+  const handleAdFinished = useCallback(async () => {
+    setShowAdDialog(false);
+    try {
+      const { success, reason } = await markAttemptAsReviewed(attempt.slotId);
+      if (success) {
+        setIsReviewed(true);
+        toastApi.toast?.({
+          title: 'Success',
+          description: 'You can now review your answers.',
+        });
+        setShowReviewDialog(true);
+      } else {
+        toastApi.toast?.({
+          title: 'Update Failed',
+          description: `Could not save review state: ${reason || 'Please check connection.'}`,
+          variant: 'destructive',
         });
       }
-    } else {
-      const { email, password } = values as z.infer<typeof loginSchema>;
-      result = await loginWithEmail(email, password);
+    } finally {
+      setIsReviewing(false);
+    }
+  }, [attempt.slotId, markAttemptAsReviewed, toastApi]);
 
-      if (result) {
-        router.replace(from);
+  const handleAdDialogClose = (open: boolean) => {
+    if (!open) {
+      if (isReviewing && !showReviewDialog) {
+        setIsReviewing(false);
       }
     }
+    setShowAdDialog(open);
   };
 
-  const handleGoogleSignIn = async () => {
-    const from = searchParams.get('from') ?? '/';
-    const result = await signInWithGoogle();
+  const attemptDate = normalizeTimestamp(attempt.timestamp);
+  const isPerfectScore = attempt.score === attempt.totalQuestions && !attempt.reason;
+  const slotTiming = getSlotTimings(attempt.timestamp);
 
-    if (result) {
-      router.replace(from);
-    }
-  };
+  const formattedDate = attemptDate
+    ? attemptDate
+        .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        .replace(/\//g, '-')
+    : 'Invalid Date';
 
-  if (user) {
-    const from = searchParams.get('from') ?? '/';
-    router.replace(from);
-    return null;
+  return (
+    <>
+      <Card key={attempt.slotId} className="bg-card/80 shadow-lg animate-fade-in-up">
+        <CardHeader className="pb-4">
+          <div className="flex items-start gap-4">
+            <div className="mt-1 flex-shrink-0">
+              {isDisqualified ? <Ban className="h-8 w-8 text-destructive" /> : isPerfectScore ? <Award className="h-8 w-8 text-primary" /> : <CheckCircle className="h-8 w-8 text-primary" />}
+            </div>
+            <div className="flex-grow">
+              <CardTitle className="text-lg">{attempt.format} Quiz</CardTitle>
+              <CardDescription>Sponsored by {attempt.brand}</CardDescription>
+              <CardDescription className="pt-2">{isDisqualified ? 'Disqualified (No Ball)' : `Scored ${attempt.score}/${attempt.totalQuestions}`}</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span>{formattedDate}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              <span>{slotTiming} (IST)</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={handleReviewClick} disabled={isDisqualified || isReviewing}>
+              {isReviewing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isReviewed ? <Check className="mr-2 h-4 w-4 text-green-500" /> : <Eye className="mr-2 h-4 w-4 text-primary" />}
+              {isReviewing ? 'Processing...' : isReviewed ? 'Reviewed' : 'Review'}
+            </Button>
+
+            <Button variant="secondary" size="sm" onClick={() => setIsAnalysisOpen(true)} disabled={isDisqualified}>
+              <Sparkles className="mr-2 h-4 w-4 text-primary" />
+              Analysis
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {showAdDialog && adConfig && (
+        <AdDialog
+          open={showAdDialog}
+          onOpenChange={handleAdDialogClose}
+          onAdFinished={handleAdFinished}
+          duration={adConfig.duration ?? 7}
+          skippableAfter={adConfig.skippableAfter ?? 5}
+          adTitle={adConfig.title ?? 'Sponsored'}
+          adType={adConfig.type}
+          adUrl={adConfig.url}
+          adHint={adConfig.hint}
+        >
+          <p className="text-xs text-muted-foreground mt-2">Watch this ad to review your answers. This is a one-time action per quiz.</p>
+        </AdDialog>
+      )}
+
+      {attempt && <ReviewDialog open={showReviewDialog} onOpenChange={setShowReviewDialog} attempt={attempt} />}
+      {attempt && <AnalysisDialog open={isAnalysisOpen} onOpenChange={setIsAnalysisOpen} attempt={attempt} />}
+    </>
+  );
+};
+
+export const HistoryItem = memo(HistoryItemComponent);
+
+// Main wrapper component
+interface QuizHistoryContentProps {
+  attempts: QuizAttempt[];
+  isLoading: boolean;
+  error: string | null;
+}
+
+export default function QuizHistoryContent({ attempts, isLoading, error }: QuizHistoryContentProps) {
+  if (error) return <ErrorStateDisplay message={error} />;
+  if (isLoading) {
+    return (
+      <div className="space-y-4 pt-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <HistoryItemSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!attempts || attempts.length === 0) {
+    return <EmptyState Icon={Award} title="No Quiz History" description="You haven't taken any quizzes yet. Start a quiz to see your history here." />;
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>
-          {type === 'login' ? 'Time to Bat Again!' : 'Join the Squad!'}
-        </CardTitle>
-        <CardDescription>
-          {type === 'login'
-            ? 'Welcome back, player! Log in to face the next challenge.'
-            : 'Sign up to start your cricket journey and climb the leaderboard.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {type === 'signup' && (
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="John Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {type === 'signup' && (
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="10-digit number" type="tel" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="you@example.com" type="email" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* ✅ PASSWORD FIELD WITH EYE TOGGLE */}
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        placeholder="••••••••"
-                        type={showPassword ? 'text' : 'password'}
-                        {...field}
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        disabled={isSubmitting}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* ✅ CONFIRM PASSWORD FIELD (SIGNUP ONLY) WITH EYE TOGGLE */}
-            {type === 'signup' && (
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          placeholder="••••••••"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          {...field}
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                          disabled={isSubmitting}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {type === 'signup' && (
-              <FormField
-                control={form.control}
-                name="referralCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Referral Code (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter code from a friend" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {type === 'signup' && (
-              <FormField
-                control={form.control}
-                name="terms"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        I acknowledge this platform is for testing cricket knowledge only, and not for
-                        entertainment, financial gain, or gambling. I accept the{' '}
-                        <Button variant="link" asChild className="p-1 h-auto">
-                          <Link href="/policies" target="_blank" rel="noopener noreferrer">
-                            Terms & Conditions
-                          </Link>
-                        </Button>
-                        .
-                      </FormLabel>
-                      <FormMessage />
-                    </div>
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isSubmitting}
-            >
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {type === 'login' ? 'Login' : 'Sign Up'}
-            </Button>
-          </form>
-        </Form>
-
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t"></span>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-          </div>
-        </div>
-
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={handleGoogleSignIn}
-          disabled={isSubmitting}
-        >
-          {GoogleIcon}
-          Google
-        </Button>
-      </CardContent>
-
-      <CardFooter className="justify-center">
-        <p className="text-sm text-muted-foreground">
-          {type === 'login' ? "Don't have an account? " : 'Already have an account? '}
-          <Button variant="link" asChild className="p-1">
-            <Link
-              href={
-                type === 'login'
-                  ? `/auth/signup?${searchParams.toString()}`
-                  : `/auth/login?${searchParams.toString()}`
-              }
-            >
-              {type === 'login' ? 'Sign Up' : 'Login'}
-            </Link>
-          </Button>
-        </p>
-      </CardFooter>
-    </Card>
-  );
-}
-
-export default function AuthForm(props: { type: 'login' | 'signup' }) {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex justify-center p-8">
-          <Loader2 className="animate-spin h-8 w-8" />
-        </div>
-      }
-    >
-      <AuthFormComponent {...props} />
-    </Suspense>
+    <div className="space-y-4 pt-4">
+      {attempts.map((attempt) => (
+        <HistoryItem key={attempt.slotId} attempt={attempt} />
+      ))}
+    </div>
   );
 }

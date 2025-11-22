@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileoverview This flow handles processing a payout request.
@@ -10,7 +9,8 @@ import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { doc, runTransaction, increment, serverTimestamp, collection } from 'firebase/firestore';
 
-export const ProcessPayoutInputSchema = z.object({
+// Define schemas using z.object() WITHOUT type assertions
+const ProcessPayoutInputSchema = z.object({
     payoutId: z.string().describe("The ID of the payout document to process."),
     status: z.enum(['completed', 'failed']).describe("The new status for the payout."),
     adminId: z.string().describe("The ID of the admin processing the request."),
@@ -19,22 +19,24 @@ export const ProcessPayoutInputSchema = z.object({
 
 export type ProcessPayoutInput = z.infer<typeof ProcessPayoutInputSchema>;
 
-export const ProcessPayoutOutputSchema = z.object({
+const ProcessPayoutOutputSchema = z.object({
     success: z.boolean(),
     message: z.string(),
 });
 
-export async function processPayout(input: ProcessPayoutInput): Promise<z.infer<typeof ProcessPayoutOutputSchema>> {
+export type ProcessPayoutOutput = z.infer<typeof ProcessPayoutOutputSchema>;
+
+export async function processPayout(input: ProcessPayoutInput): Promise<ProcessPayoutOutput> {
     return processPayoutFlow(input);
 }
 
 const processPayoutFlow = ai.defineFlow(
     {
         name: 'processPayoutFlow',
-        inputSchema: ProcessPayoutInputSchema,
-        outputSchema: ProcessPayoutOutputSchema,
+        inputSchema: ProcessPayoutInputSchema as any,  // Type assertion for Genkit
+        outputSchema: ProcessPayoutOutputSchema as any, // Type assertion for Genkit
     },
-    async (input: ProcessPayoutInput) => {
+    async (input: ProcessPayoutInput): Promise<ProcessPayoutOutput> => {
         if (!db) {
             return { success: false, message: "Database connection not available." };
         }

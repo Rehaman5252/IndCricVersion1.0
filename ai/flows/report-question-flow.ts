@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -10,7 +9,7 @@ import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-export const ReportQuestionInputSchema = z.object({
+const ReportQuestionInputSchema = z.object({
   questionId: z.string().describe("The ID of the question being reported."),
   questionText: z.string().describe("The full text of the question."),
   reason: z.string().min(1, { message: "A reason is required." }).describe("The reason for the report."),
@@ -20,23 +19,25 @@ export const ReportQuestionInputSchema = z.object({
 
 export type ReportQuestionInput = z.infer<typeof ReportQuestionInputSchema>;
 
-export const ReportQuestionOutputSchema = z.object({
+const ReportQuestionOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   reportId: z.string().optional(),
 });
 
-export async function reportQuestion(input: ReportQuestionInput): Promise<z.infer<typeof ReportQuestionOutputSchema>> {
+export type ReportQuestionOutput = z.infer<typeof ReportQuestionOutputSchema>;
+
+export async function reportQuestion(input: ReportQuestionInput): Promise<ReportQuestionOutput> {
   return reportQuestionFlow(input);
 }
 
 export const reportQuestionFlow = ai.defineFlow(
   {
     name: 'reportQuestionFlow',
-    inputSchema: ReportQuestionInputSchema,
-    outputSchema: ReportQuestionOutputSchema,
+    inputSchema: ReportQuestionInputSchema as any,
+    outputSchema: ReportQuestionOutputSchema as any,
   },
-  async (input: z.infer<typeof ReportQuestionInputSchema>): Promise<z.infer<typeof ReportQuestionOutputSchema>> => {
+  async (input: ReportQuestionInput): Promise<ReportQuestionOutput> => {
     if (!db) {
       return { success: false, message: "Database connection not available." };
     }
@@ -64,4 +65,3 @@ export const reportQuestionFlow = ai.defineFlow(
     }
   }
 );
-    

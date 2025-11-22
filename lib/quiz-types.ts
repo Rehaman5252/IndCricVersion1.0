@@ -1,3 +1,5 @@
+// lib/quiz-types.ts
+
 export interface Question {
   id: string;
   text: string;
@@ -24,6 +26,24 @@ export interface QuestionPool {
   lastUpdated: Date;
 }
 
+/**
+ * Winner record for detailed winner lists
+ */
+export interface WinnerRecord {
+  userId: string;
+  username: string;
+  score: number;
+  rank: number;
+  prize: number;
+}
+
+/**
+ * QuizSlot represents a scheduled/run quiz slot.
+ *
+ * NOTE:
+ * - `winners` is kept as a numeric count to match code that expects a number.
+ * - `winnersList` (optional) provides structured winner records when available.
+ */
 export interface QuizSlot {
   id: string;
   slotNumber: number;
@@ -33,7 +53,17 @@ export interface QuizSlot {
   durationMinutes: number;
   status: 'scheduled' | 'live' | 'completed' | 'cancelled';
   participants: number;
+
+  /**
+   * Numeric winners count (keeps compatibility with places expecting a number)
+   */
   winners: number;
+
+  /**
+   * Optional detailed winner records (use this when you need the actual winner entries)
+   */
+  winnersList?: WinnerRecord[];
+
   questionsPerUser: number; // Usually 5
   questionGeneration: {
     method: 'ai' | 'pool' | 'manual';
@@ -48,13 +78,6 @@ export interface QuizSlot {
     assignedQuestions: string[];
     score: number;
     timestamp: Date;
-  }[];
-  winners: {
-    userId: string;
-    username: string;
-    score: number;
-    rank: number;
-    prize: number;
   }[];
   payoutLocked: boolean;
   createdBy: string;

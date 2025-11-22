@@ -1,181 +1,205 @@
+// src/components/home/home-page-client.tsx
 'use client';
 
-import React from 'react';
+import React, { memo, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { memo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/providers/auth-provider';
-import { useQuizStatus } from '@/providers/quiz-status-provider';
-import { useToast } from '@/hooks/use-toast';
-import type { CubeBrand } from '@/hooks/use-brand-ads';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
-import dynamic from 'next/dynamic';
-import HomeContentSkeleton from './home-content-skeleton';
-import { useBrandAds } from '@/hooks/use-brand-ads';
 
-const CricketFact = dynamic(() => import('@/components/home/cricket-fact'), {
-    loading: () => <Skeleton className="h-40 w-full" />,
-});
+import { useAuth } from '@/context/AuthProvider';
+import { useQuizStatus } from '@/context/QuizStatusProvider';
+import { useToast } from '@/hooks/use-toast';
+import { encodeAttempt } from '@/lib/quiz-utils';
+import { brandData } from '@/components/home/brandData';
+import type { CubeBrand } from '@/components/home/brandData';
 
-const HomeClientContent = dynamic(() => import('@/components/home/home-client-content').catch(e => {
-    console.error("Failed to load HomeClientContent chunk", e);
-    return function ChunkLoadFallback() {
-        return (
-            <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Error Loading Content</AlertTitle>
-                <AlertDescription>
-                    There was a problem loading this feature. Please check your connection and try again.
-                </AlertDescription>
-            </Alert>
-        );
-    }
-}), { 
-    loading: () => <HomeContentSkeleton />,
-    ssr: false 
-});
+/**
+ * Dynamic loaders return a module-like object: { default: Component }
+ * This keeps next/dynamic + TypeScript happy and preserves prop typing.
+ */
 
-const StartQuizButton = dynamic(() => import('@/components/home/start-quiz-button'), {
-    loading: () => <Skeleton className="h-12 w-full rounded-full" />,
-});
+/* CricketFact props */
+type CricketFactProps = { format?: string };
 
+/* HomeClientContent props */
+type HomeClientContentProps = {
+  selectedBrand: CubeBrand;
+  setSelectedBrand: (b: CubeBrand) => void;
+  handleStartQuiz: (b?: CubeBrand) => void;
+};
 
-const MalpracticeWarning = memo(() => {
-    const { profile } = useAuth();
-    if (!profile) return null;
+/* StartQuizButton props */
+type StartQuizButtonProps = {
+  brandFormat?: string; // The error suggests this should be string | undefined, but 'format' is string, so it's fine.
+  onClick?: () => void;
+  isDisabled?: boolean;
+  hasPlayed?: boolean;
+};
 
-    const noBallCount = profile.noBallCount || 0;
-    if (noBallCount <= 0 || noBallCount >= 3) return null;
+// FIX 1: Corrected dynamic loading for CricketFact
+const CricketFact = dynamic<CricketFactProps>(
+  () =>
+    import('@/components/home/CricketFact').then((m) => {
+      // Assuming CricketFact has a named export or a default export
+      const comp = m.default || (m as any).CricketFact;
+      // This is the structure next/dynamic expects to be returned
+      return { default: comp } as { default: React.ComponentType<CricketFactProps> };
+    }),
+  { loading: () => <Skeleton className="h-40 w-full" />, ssr: false }
+);
 
-    const today = new Date().setHours(0, 0, 0, 0);
-    
-    const lastNoBallDay = profile.lastNoBallTimestamp 
-        ? profile.lastNoBallTimestamp.toDate().setHours(0, 0, 0, 0) 
-        : null;
+// FIX 2: Corrected dynamic loading for HomeClientContent
+const HomeClientContent = dynamic<HomeClientContentProps>(
+  () =>
+    import('@/components/home/HomeClientContent').then((m) => {
+      const comp = m.default || (m as any).HomeClientContent;
+      return { default: comp } as { default: React.ComponentType<HomeClientContentProps> };
+    }),
+  { loading: () => <Skeleton className="h-80 w-full" />, ssr: false }
+);
 
-    if (lastNoBallDay !== today) return null;
+// FIX 3: Corrected dynamic loading for StartQuizButton
+const StartQuizButton = dynamic<StartQuizButtonProps>(
+  () =>
+    import('@/components/home/StartQuizButton').then((m) => {
+      const comp = m.default || (m as any).StartQuizButton;
+      return { default: comp } as { default: React.ComponentType<StartQuizButtonProps> };
+    }),
+  { loading: () => <Skeleton className="h-12 w-full rounded-full" />, ssr: false }
+);
 
-    const warningsLeft = 3 - noBallCount;
-    
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-        >
-            <Alert variant="destructive" className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Fair Play Warning!</AlertTitle>
-                <AlertDescription>
-                    You have {noBallCount} No-Ball(s) today. {warningsLeft} more and you're Out for the Day! Please contact support to appeal.
-                </AlertDescription>
-            </Alert>
-        </motion.div>
-    );
-});
-MalpracticeWarning.displayName = 'MalpracticeWarning';
+/* Skeleton used while auth/brands load */
+const HomeContentSkeleton: React.FC = () => (
+  <div className="space-y-8 animate-pulse">
+    <div className="text-center mb-4">
+      <Skeleton className="h-8 w-3/4 mx-auto" />
+      <Skeleton className="h-4 w-1/2 mx-auto mt-2" />
+    </div>
+    <div className="flex justify-center items-center h-[200px]">
+      <Skeleton className="w-48 h-48 rounded-lg" />
+    </div>
+    <Skeleton className="h-[124px] w-full rounded-2xl" />
+    <div className="grid grid-cols-2 gap-4">
+      <Skeleton className="h-[92px] w-full" />
+      <Skeleton className="h-[92px] w-full" />
+      <Skeleton className="h-[92px] w-full" />
+      <Skeleton className="h-[92px] w-full" />
+    </div>
+    <Skeleton className="h-16 w-full rounded-full" />
+  </div>
+);
 
+/* Fair-play warning component */
+function MalpracticeWarning() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+
+  const noBallCount = profile.noBallCount || 0;
+  if (noBallCount <= 0 || noBallCount >= 3) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const lastNoBallDay = profile.lastNoBallTimestamp
+    ? new Date(profile.lastNoBallTimestamp.seconds * 1000).setHours(0, 0, 0, 0)
+    : null;
+
+  if (lastNoBallDay !== today.getTime()) return null;
+
+  const warningsLeft = 3 - noBallCount;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      <Alert variant="destructive" className="mb-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Fair Play Warning!</AlertTitle>
+        <AlertDescription>
+          You have {noBallCount} No-Ball(s) today. {warningsLeft} more and you're Out for the Day! Please contact support to appeal.
+        </AlertDescription>
+      </Alert>
+    </motion.div>
+  );
+}
+
+/* Main page component */
 function HomePageClient() {
-    const { user, isProfileComplete, lastAttemptInSlot, loading: authLoading } = useAuth();
-    const { isLoading: isQuizStatusLoading } = useQuizStatus();
-    const { brands, loading: brandsLoading, error: brandsError } = useBrandAds();
-    const router = useRouter();
-    const { toast } = useToast();
-    const [selectedBrand, setSelectedBrand] = useState<CubeBrand | null>(null);
+  // Real context hooks from your project
+  const { user, isProfileComplete, lastAttemptInSlot, loading: authLoading } = useAuth();
+  const { isLoading: isQuizStatusLoading } = useQuizStatus();
+  const { toast } = useToast();
+  const router = useRouter();
 
-    const hasPlayedInCurrentSlot = !!lastAttemptInSlot;
+  const [selectedBrand, setSelectedBrand] = useState<CubeBrand>(brandData[0]);
+  const hasPlayedInCurrentSlot = !!lastAttemptInSlot;
 
-    // Effect to set the initial selected brand once data is loaded
-    React.useEffect(() => {
-        if (!selectedBrand && brands.length > 0) {
-            setSelectedBrand(brands[0]);
-        }
-    }, [brands, selectedBrand]);
+  const handleStartQuiz = useCallback(
+    (brandToPlay?: CubeBrand) => {
+      const brand = brandToPlay || selectedBrand;
 
-    const handleStartQuiz = useCallback((brandToPlay?: CubeBrand) => {
-        const brand = brandToPlay || selectedBrand;
-        if (!brand) {
-            toast.error("Please select a quiz format first.");
-            return;
-        }
+      if (!user) {
+        router.push(`/auth/login?from=/`);
+        return;
+      }
 
-        if (!user) {
-            router.push(`/auth/login?from=/`);
-            return;
-        }
-        
-        if (hasPlayedInCurrentSlot && lastAttemptInSlot) {
-            router.push(`/quiz/results?attemptId=${lastAttemptInSlot.slotId}`);
-            toast.info("You've already played this innings!", {
-                description: `Showing your results for the ${lastAttemptInSlot.format} quiz. You can only attempt one quiz per slot.`,
-            });
-            return;
-        }
+      if (hasPlayedInCurrentSlot && lastAttemptInSlot) {
+        router.push(`/quiz/results?attempt=${encodeAttempt(lastAttemptInSlot)}`);
+        toast({
+          title: "You've already played this innings!",
+          description: `Showing your results for the ${lastAttemptInSlot.format} quiz. You can only attempt one quiz per slot.`,
+        });
+        return;
+      }
 
-        if (!user.emailVerified) {
-            toast.error("Email not verified", {
-                description: "Please verify your email address before playing a quiz.",
-            });
-            return;
-        }
-        if (!isProfileComplete) {
-            toast.error("Profile Incomplete", {
-                description: "Please complete your profile to start playing quizzes.",
-            });
-            router.push('/profile');
-            return;
-        }
-        
-        router.push(`/quiz?brand=${encodeURIComponent(brand.brand)}&format=${encodeURIComponent(brand.format)}`);
-    }, [user, hasPlayedInCurrentSlot, lastAttemptInSlot, isProfileComplete, selectedBrand, router, toast]);
+      if (!user.emailVerified) {
+        toast({
+          title: 'Email not verified',
+          description: 'Please verify your email address before playing a quiz.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-    if (authLoading || brandsLoading) {
-        return <HomeContentSkeleton />;
-    }
+      if (!isProfileComplete) {
+        toast({
+          title: 'Profile Incomplete',
+          description: 'Please complete your profile to start playing quizzes.',
+          variant: 'destructive',
+        });
+        router.push('/profile');
+        return;
+      }
 
-    if (brandsError) {
-        return (
-             <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Error Loading Quiz Data</AlertTitle>
-                <AlertDescription>{brandsError}</AlertDescription>
-            </Alert>
-        )
-    }
-    
-    return (
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="space-y-6"
-        >
-            <MalpracticeWarning />
-            
-            <HomeClientContent 
-                brands={brands}
-                selectedBrand={selectedBrand}
-                setSelectedBrand={setSelectedBrand}
-                handleStartQuiz={handleStartQuiz}
-            />
-            
-            <div className="mt-6">
-                <StartQuizButton
-                    brandFormat={hasPlayedInCurrentSlot && lastAttemptInSlot ? lastAttemptInSlot.format : selectedBrand?.format || ''}
-                    onClick={() => handleStartQuiz()}
-                    isDisabled={isQuizStatusLoading || !selectedBrand}
-                    hasPlayed={hasPlayedInCurrentSlot}
-                />
-            </div>
-            
-            <div className="mt-8">
-                <CricketFact format={selectedBrand?.format || 'cricket'} />
-            </div>
+      router.push(`/quiz?brand=${encodeURIComponent(brand.brand)}&format=${encodeURIComponent(brand.format)}`);
+    },
+    [user, hasPlayedInCurrentSlot, lastAttemptInSlot, isProfileComplete, selectedBrand, router, toast]
+  );
 
-        </motion.div>
-    );
+  if (authLoading) return <HomeContentSkeleton />;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="space-y-6">
+      <MalpracticeWarning />
+
+      <HomeClientContent selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} handleStartQuiz={handleStartQuiz} />
+
+      <div className="mt-6">
+        <StartQuizButton
+          // FIX 4: Ensure the prop value matches the type, which is CubeBrand.format (string) or undefined.
+          // lastAttemptInSlot.format is a string.
+          brandFormat={hasPlayedInCurrentSlot ? lastAttemptInSlot!.format : selectedBrand.format}
+          onClick={() => handleStartQuiz()}
+          isDisabled={isQuizStatusLoading}
+          hasPlayed={hasPlayedInCurrentSlot}
+        />
+      </div>
+
+      <div className="mt-8">
+        <CricketFact format={selectedBrand.format} />
+      </div>
+    </motion.div>
+  );
 }
 
 export default memo(HomePageClient);

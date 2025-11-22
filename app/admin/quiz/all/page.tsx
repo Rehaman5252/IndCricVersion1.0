@@ -1,7 +1,6 @@
 'use client';
 import AdminAuthGuard from '@/app/components/admin/AdminAuthGuard';
 import AdminLayout from '@/app/components/admin/AdminLayout';
-import QuizManager from '@/app/components/admin/QuizManager';
 
 export default function AllQuizzesPage() {
   return (
@@ -12,7 +11,7 @@ export default function AllQuizzesPage() {
             <h1 className="text-3xl font-bold">All Quizzes</h1>
             <p className="text-gray-600 mt-1">View and manage all quizzes</p>
           </div>
-          <QuizManager />
+          
         </div>
       </AdminLayout>
     </AdminAuthGuard>

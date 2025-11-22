@@ -1,240 +1,216 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Ad, AD_SLOT_NAMES, VIDEO_AD_SLOTS } from '@/types/ads';
-import { getAllAds, deleteAd, updateAd } from '@/lib/ad-service';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { useEffect, useState } from "react";
+import { Ad, AdSlot, AD_SLOT_NAMES, VIDEO_AD_SLOTS } from "@/types/ads";
+import { getAllAds, deleteAd, updateAd } from "@/lib/ad-service";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface AdsListProps {
-  filterMode?: 'none' | 'total' | 'active' | 'deactivated' | 'revenue';
+  filterMode?: "none" | "total" | "active" | "deactivated" | "revenue";
   onUpdate?: () => void;
 }
 
-export default function AdsList({ filterMode = 'none', onUpdate }: AdsListProps) {
+// Convert raw API ads → strongly typed Ad
+function sanitizeAds(raw: any[]): Ad[] {
+  const validSlots = Object.keys(AD_SLOT_NAMES) as AdSlot[];
+
+  return raw.map((r, index) => {
+    const slot = r.adSlot as string;
+
+    const adSlot: AdSlot = validSlots.includes(slot as AdSlot)
+      ? (slot as AdSlot)
+      : "Mixed";
+
+    return {
+      id: String(r.id ?? index),
+      companyName: String(r.companyName ?? "Unknown"),
+      adSlot,
+      adType: r.adType === "video" ? "video" : "image",
+      mediaUrl: String(r.mediaUrl ?? ""),
+      revenue: Number(r.revenue ?? 0),
+      isActive: Boolean(r.isActive),
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    };
+  });
+}
+
+export default function AdsList({ filterMode = "none", onUpdate }: AdsListProps) {
   const { toast } = useToast();
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editRevenue, setEditRevenue] = useState('');
-
-  // Load ads
-  const loadAds = async () => {
-    try {
-      setLoading(true);
-      const fetchedAds = await getAllAds();
-      setAds(fetchedAds);
-      console.log('✅ Loaded ads:', fetchedAds);
-    } catch (error) {
-      console.error('Error loading ads:', error);
-      toast({
-        title: '❌ Error',
-        description: 'Failed to load ads',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [editRevenue, setEditRevenue] = useState("");
 
   useEffect(() => {
-    loadAds();
+    (async () => {
+      try {
+        setLoading(true);
+        const rawAds = await getAllAds();
+        const cleanAds = sanitizeAds(rawAds);
+        setAds(cleanAds);
+      } catch (err) {
+        console.error(err);
+        toast({
+          title: "Error",
+          description: "Failed to load ads",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  // Filter ads based on mode
-  const getFilteredAds = () => {
+  const filteredAds = (() => {
     switch (filterMode) {
-      case 'total':
-        return ads;
-      case 'active':
-        return ads.filter(ad => ad.isActive);
-      case 'deactivated':
-        return ads.filter(ad => !ad.isActive);
-      case 'revenue':
+      case "active":
+        return ads.filter((a) => a.isActive);
+      case "deactivated":
+        return ads.filter((a) => !a.isActive);
+      case "revenue":
         return [...ads].sort((a, b) => b.revenue - a.revenue);
       default:
         return ads;
     }
-  };
+  })();
 
-  const displayedAds = getFilteredAds();
-
-  // Delete ad
-  const handleDelete = async (adId: string) => {
-    if (!confirm('Are you sure you want to delete this ad?')) return;
-
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this ad?")) return;
     try {
-      setDeleting(adId);
-      await deleteAd(adId);
-      setAds(ads.filter(ad => ad.id !== adId));
-      onUpdate?.(); // Refresh stats
-      toast({
-        title: '✅ Success',
-        description: 'Ad deleted successfully',
-      });
-    } catch (error) {
-      console.error('Error deleting ad:', error);
-      toast({
-        title: '❌ Error',
-        description: 'Failed to delete ad',
-        variant: 'destructive',
-      });
+      setDeleting(id);
+      await deleteAd(id);
+      setAds((prev) => prev.filter((a) => a.id !== id));
+      onUpdate?.();
+      toast({ title: "Deleted", description: "Ad removed." });
+    } catch (e) {
+      toast({ title: "Error", description: "Could not delete", variant: "destructive" });
     } finally {
       setDeleting(null);
     }
   };
 
-  // Toggle active status
   const handleToggleActive = async (ad: Ad) => {
     try {
       await updateAd(ad.id, { isActive: !ad.isActive });
-      setAds(ads.map(a => a.id === ad.id ? { ...a, isActive: !a.isActive } : a));
-      onUpdate?.(); // Refresh stats
+      setAds((prev) => prev.map((a) => (a.id === ad.id ? { ...a, isActive: !a.isActive } : a)));
+      onUpdate?.();
+    } catch (err) {
       toast({
-        title: '✅ Success',
-        description: `Ad ${!ad.isActive ? 'activated' : 'deactivated'}`,
-      });
-    } catch (error) {
-      console.error('Error updating ad:', error);
-      toast({
-        title: '❌ Error',
-        description: 'Failed to update ad',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to update status",
+        variant: "destructive",
       });
     }
   };
 
-  // Update revenue
-  const handleUpdateRevenue = async (adId: string) => {
+  const handleUpdateRevenue = async (id: string) => {
     if (!editRevenue || isNaN(Number(editRevenue))) {
-      toast({
-        title: '❌ Error',
-        description: 'Please enter valid revenue',
-        variant: 'destructive',
-      });
+      toast({ title: "Invalid", description: "Enter valid revenue", variant: "destructive" });
       return;
     }
 
     try {
-      await updateAd(adId, { revenue: Number(editRevenue) });
-      setAds(ads.map(a => a.id === adId ? { ...a, revenue: Number(editRevenue) } : a));
+      await updateAd(id, { revenue: Number(editRevenue) });
+      setAds((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, revenue: Number(editRevenue) } : a))
+      );
       setEditingId(null);
-      setEditRevenue('');
-      onUpdate?.(); // Refresh stats
-      toast({
-        title: '✅ Success',
-        description: 'Revenue updated',
-      });
-    } catch (error) {
-      console.error('Error updating revenue:', error);
-      toast({
-        title: '❌ Error',
-        description: 'Failed to update revenue',
-        variant: 'destructive',
-      });
+      setEditRevenue("");
+      onUpdate?.();
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to update revenue", variant: "destructive" });
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-8">⏳ Loading ads...</div>;
-  }
+  if (loading) return <div className="text-center py-6">Loading ads…</div>;
 
-  if (displayedAds.length === 0) {
+  if (filteredAds.length === 0)
     return (
       <Card>
-        <CardContent className="py-8 text-center text-gray-500">
-          📭 No ads found. {filterMode !== 'none' ? 'Try a different filter.' : 'Create one to get started!'}
+        <CardContent className="text-center py-6">
+          No ads found {filterMode !== "none" && `(filter: ${filterMode})`}
         </CardContent>
       </Card>
     );
-  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">📊 Displaying {displayedAds.length} Ads</CardTitle>
+        <CardTitle>Displaying {filteredAds.length} Ads</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {displayedAds.map(ad => (
-            <div key={ad.id} className="border border-gray-700 rounded-lg p-4 bg-gray-900/50">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
-                {/* Thumbnail */}
-                <div className="md:col-span-1">
-                  {ad.adType === 'image' ? (
-                    <img
-                      src={ad.mediaUrl}
-                      alt={ad.companyName}
-                      className="w-full h-24 object-cover rounded-lg"
-                    />
+          {filteredAds.map((ad) => (
+            <div key={ad.id} className="p-4 bg-gray-900/40 rounded-lg border border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                
+                {/* Image / Video */}
+                <div>
+                  {ad.adType === "image" ? (
+                    <img src={ad.mediaUrl} alt="ad" className="rounded w-full h-24 object-cover" />
                   ) : (
-                    <div className="w-full h-24 bg-gray-800 rounded-lg flex items-center justify-center">
-                      🎬 Video
+                    <div className="w-full h-24 bg-gray-800 rounded flex items-center justify-center">
+                      🎬 VIDEO
                     </div>
                   )}
                 </div>
 
                 {/* Info */}
-                <div className="md:col-span-2 space-y-2">
+                <div className="md:col-span-2">
                   <p className="font-bold text-white">{ad.companyName}</p>
-                  <p className="text-sm text-gray-400">
-                    Slot: <span className="font-semibold text-yellow-400">{AD_SLOT_NAMES[ad.adSlot] || ad.adSlot}</span>
-                    {VIDEO_AD_SLOTS.includes(ad.adSlot) && <span className="ml-2 text-red-400">🎬 VIDEO</span>}
+
+                  <p className="text-sm text-gray-300">
+                    Slot:{" "}
+                    <span className="text-yellow-400 font-semibold">
+                      {AD_SLOT_NAMES[ad.adSlot]}
+                    </span>
+                    {VIDEO_AD_SLOTS.includes(ad.adSlot) && (
+                      <span className="ml-2 text-red-400">🎥 Video</span>
+                    )}
                   </p>
                 </div>
 
-                {/* Revenue Edit */}
-                <div className="md:col-span-1">
+                {/* Revenue */}
+                <div>
                   {editingId === ad.id ? (
                     <div className="space-y-2">
                       <input
                         type="number"
                         value={editRevenue}
                         onChange={(e) => setEditRevenue(e.target.value)}
-                        placeholder="Revenue"
-                        className="w-full px-2 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                        className="bg-gray-800 w-full px-2 py-1 rounded text-white"
                       />
-                      <Button
-                        onClick={() => handleUpdateRevenue(ad.id)}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white text-xs py-1"
-                      >
-                        Save
-                      </Button>
+                      <Button onClick={() => handleUpdateRevenue(ad.id)}>Save</Button>
                     </div>
                   ) : (
                     <div
+                      className="cursor-pointer"
                       onClick={() => {
                         setEditingId(ad.id);
-                        setEditRevenue(ad.revenue.toString());
+                        setEditRevenue(String(ad.revenue));
                       }}
-                      className="cursor-pointer p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
                     >
-                      <p className="text-sm text-gray-400">Revenue</p>
-                      <p className="font-bold text-green-400">₹{ad.revenue}</p>
+                      <p className="text-gray-400 text-sm">Revenue</p>
+                      <p className="text-green-400 font-bold">₹{ad.revenue}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Actions */}
-                <div className="md:col-span-1 space-y-2">
-                  <Button
-                    onClick={() => handleToggleActive(ad)}
-                    className={`w-full text-xs py-1 ${
-                      ad.isActive
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-gray-600 hover:bg-gray-700'
-                    } text-white`}
-                  >
-                    {ad.isActive ? '✅ Active' : '⏸ Inactive'}
+                <div className="space-y-2">
+                  <Button onClick={() => handleToggleActive(ad)}>
+                    {ad.isActive ? "Active" : "Inactive"}
                   </Button>
                   <Button
                     onClick={() => handleDelete(ad.id)}
                     disabled={deleting === ad.id}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white text-xs py-1"
+                    className="bg-red-600 hover:bg-red-700"
                   >
-                    {deleting === ad.id ? '⏳ Deleting...' : '🗑️ Delete'}
+                    {deleting === ad.id ? "Deleting…" : "Delete"}
                   </Button>
                 </div>
               </div>

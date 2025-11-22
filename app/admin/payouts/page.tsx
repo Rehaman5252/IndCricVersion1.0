@@ -1,7 +1,7 @@
 'use client';
 import AdminAuthGuard from '@/app/components/admin/AdminAuthGuard';
 import AdminLayout from '@/app/components/admin/AdminLayout';
-import PayoutsManager from '@/app/components/admin/PayoutsManager';
+
 
 export default function PayoutsPage() {
   return (
@@ -12,7 +12,7 @@ export default function PayoutsPage() {
             <h1 className="text-3xl font-bold">Payouts Management</h1>
             <p className="text-gray-600 mt-1">Process and manage user payouts</p>
           </div>
-          <PayoutsManager />
+          
         </div>
       </AdminLayout>
     </AdminAuthGuard>

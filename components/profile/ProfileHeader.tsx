@@ -10,7 +10,6 @@ import { CheckCircle2, AlertCircle, Edit } from 'lucide-react';
 import { calculateAge, maskPhone } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { sendEmailVerification } from 'firebase/auth';
-import { getAuth } from '@/lib/firebase';
 import { PhoneVerificationDialog } from './PhoneVerificationDialog';
 import { EditProfileDialog } from './EditProfileDialog';
 import { normalizeTimestamp } from '@/lib/dates';
@@ -26,8 +25,7 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
     const isEmailVerified = user?.emailVerified || false;
 
     const handleResendVerification = async () => {
-        const auth = getAuth();
-        if (!user || !auth) {
+        if (!user) {
             toast({ title: 'Error', description: 'You must be logged in.', variant: 'destructive' });
             return;
         }
@@ -37,7 +35,7 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
         } catch (error: any) {
             console.error("Error resending verification email:", error);
             let message = "Could not send verification email.";
-            if (error.code === 'auth/too-many-requests') {
+            if (error?.code === 'auth/too-many-requests') {
                 message = "You've requested this too many times. Please wait before trying again.";
             }
             toast({ title: 'Error', description: message, variant: 'destructive' });
@@ -76,7 +74,7 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
                         <p className="text-muted-foreground text-sm">{maskPhone(userProfile?.phone)}</p>
                         {userProfile.phone ? (
                             isPhoneVerified ? (
-                                // ✅ FIXED: Removed title prop, use aria-label instead
+                                // use aria-label for accessibility
                                 <CheckCircle2 className="h-4 w-4 text-green-500" aria-label="Phone Verified" />
                             ) : (
                                 <PhoneVerificationDialog phone={userProfile.phone}>
@@ -92,7 +90,6 @@ function ProfileHeaderComponent({ userProfile }: { userProfile: any }) {
                         <p className="text-muted-foreground text-sm">{userProfile?.email || 'No email set'}</p>
                         {userProfile?.email && (
                             isEmailVerified ? (
-                                // ✅ FIXED: Removed title prop, use aria-label instead
                                 <CheckCircle2 className="h-4 w-4 text-green-500" aria-label="Email Verified" />
                             ) : (
                                 <Button
