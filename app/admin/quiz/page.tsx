@@ -1,14 +1,7 @@
-<<<<<<< HEAD
 "use client";
 
 import AdminAuthGuard from "@/app/components/admin/AdminAuthGuard";
 import AdminLayout from "@/app/components/admin/AdminLayout";
-=======
-'use client';
-import AdminAuthGuard from '@/app/components/admin/AdminAuthGuard';
-import AdminLayout from '@/app/components/admin/AdminLayout';
-
->>>>>>> 8ec5e5e2259e6670ebe5762e1aa244570c78c9b1
 
 export default function QuizPage() {
   return (
