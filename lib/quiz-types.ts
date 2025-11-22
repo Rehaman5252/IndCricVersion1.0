@@ -1,130 +1,121 @@
-// lib/quiz-types.ts
+// src/lib/quiz-types.ts
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+export type QuestionFormat = string;
 
 export interface Question {
   id: string;
-  text: string;
-  options: string[];
-  correctOption: number;
-  difficulty: 'easy' | 'medium' | 'hard';
-  category: string;
-  format: 'IPL' | 'Test' | 'T20I' | 'ODI' | 'General';
-  confidence?: number; // AI confidence score 0-100
-  createdAt: Date;
-  lastUsed?: Date;
-  usageCount: number;
-  isRetired: boolean;
+  poolId?: string;
+  format: QuestionFormat;
+  difficulty?: Difficulty;
+  question: string;
+  options?: string[];
+  answerIndex?: number;
+  explanation?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  retired?: boolean;
+  metadata?: Record<string, any>;
 }
 
 export interface QuestionPool {
   id: string;
-  format: 'IPL' | 'Test' | 'T20I' | 'ODI' | 'General';
-  difficulty: 'easy' | 'medium' | 'hard';
+  format: QuestionFormat;
+  difficulty?: Difficulty;
   totalQuestions: number;
-  usedThisMonth: number;
-  remaining: number;
-  retiredQuestions: number;
-  lastUpdated: Date;
-}
-
-/**
- * Winner record for detailed winner lists
- */
-export interface WinnerRecord {
-  userId: string;
-  username: string;
-  score: number;
-  rank: number;
-  prize: number;
-}
-
-/**
- * QuizSlot represents a scheduled/run quiz slot.
- *
- * NOTE:
- * - `winners` is kept as a numeric count to match code that expects a number.
- * - `winnersList` (optional) provides structured winner records when available.
- */
-export interface QuizSlot {
-  id: string;
-  slotNumber: number;
-  scheduledDate: Date;
-  startTime: string; // "01:00 PM"
-  endTime: string; // "01:10 PM"
-  durationMinutes: number;
-  status: 'scheduled' | 'live' | 'completed' | 'cancelled';
-  participants: number;
-
-  /**
-   * Numeric winners count (keeps compatibility with places expecting a number)
-   */
-  winners: number;
-
-  /**
-   * Optional detailed winner records (use this when you need the actual winner entries)
-   */
-  winnersList?: WinnerRecord[];
-
-  questionsPerUser: number; // Usually 5
-  questionGeneration: {
-    method: 'ai' | 'pool' | 'manual';
-    status: 'success' | 'fallback' | 'failed' | 'pending';
-    aiModel?: string;
-    confidenceScore?: number;
-    errorMessage?: string;
-  };
-  questions: Question[];
-  userParticipationMapping: {
-    userId: string;
-    assignedQuestions: string[];
-    score: number;
-    timestamp: Date;
-  }[];
-  payoutLocked: boolean;
-  createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
+  usedThisMonth?: number;
+  remaining?: number;
+  retiredQuestions?: number;
+  lastUpdated?: Date | string;
   notes?: string;
+}
+
+export interface Winner {
+  userId: string;
+  username?: string;
+  score?: number;
+  rank?: number;
+  prize?: number;
+  awardedAt?: Date | string;
+}
+
+/** Small insight shape for admin dashboards */
+export interface QuizInsight {
+  message: string;
+  type?: 'info' | 'success' | 'warning' | 'error' | string;
+  metric?: string;
+  value?: number | string;
+  timestamp?: Date | string;
+}
+
+export interface QuizAnalytics {
+  totalQuizzesAllTime?: number;
+  plannedToday?: number;
+  totalParticipantsToday?: number;
+  totalQuestionsDisplayed?: number;
+  activeSlots?: number;
+  failedAIGenerations?: number;
+  [k: string]: any;
 }
 
 export interface AIGenerationStatus {
   id: string;
-  slotId: string;
-  timestamp: Date;
-  apiProvider: 'gemini' | 'openai' | 'custom';
-  successRate: number;
-  averageGenerationTime: number; // ms
-  fallbackUsed: number;
-  failedAttempts: number;
-  errorLog: {
-    timestamp: Date;
+  slotId?: string;
+  timestamp?: Date | string;
+  apiProvider?: string;
+  successRate?: number; // percentage 0-100
+  averageGenerationTime?: number; // ms
+  fallbackUsed?: number;
+  failedAttempts?: number;
+  errorLog?: Array<{
+    timestamp?: Date | string;
     error: string;
-    retryCount: number;
-  }[];
+    retryCount?: number;
+  }>;
+  notes?: string;
 }
 
-export interface UserQuestionsMapping {
+export type QuizSlotStatus = 'scheduled' | 'live' | 'completed' | 'cancelled' | 'paused' | string;
+
+export interface QuizSlot {
   id: string;
-  userId: string;
-  slotId: string;
-  assignedQuestions: {
-    questionId: string;
-    assignedAt: Date;
-  }[];
-  neverSeenBefore: boolean; // User hasn't seen these Q before
-  dateCreated: Date;
-}
+  slotNumber?: number;
+  scheduledDate?: Date | string;
+  startTime?: string;
+  endTime?: string;
+  durationMinutes?: number;
+  status?: QuizSlotStatus;
+  participants?: number;
 
-export interface QuizInsight {
-  message: string;
-  type: 'warning' | 'info' | 'success';
-  metric: string;
-}
+  /**
+   * Numeric winners count — matches the usage in your mock data (winners: 3).
+   * Keep this for quick checks (and to avoid changing many data files).
+   */
+  winners?: number;
 
-export interface QuizAnalytics {
-  totalQuizzesAllTime: number;
-  plannedToday: number;
-  totalParticipantsToday: number;
-  totalQuestionsDisplayed: number;
-  activeSlots: number;
-  failedAIGenerations: number;
+  /**
+   * Optional more-structured winner list (full objects).
+   * Use either `winners` (count) or `winnersList` (object array) depending on context.
+   */
+  winnersList?: Winner[];
+
+  /** Backwards-compatible alias some code might expect */
+  winnersCount?: number;
+
+  questionsPerUser?: number;
+  questionGeneration?: {
+    method?: 'ai' | 'pool' | string;
+    status?: 'pending' | 'success' | 'failed' | string;
+    aiModel?: string;
+    confidenceScore?: number;
+    errorMessage?: string;
+    [k: string]: any;
+  };
+  questions?: Question[];
+  userParticipationMapping?: Array<Record<string, any>>;
+  payoutLocked?: boolean;
+  createdBy?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  notes?: string;
 }
